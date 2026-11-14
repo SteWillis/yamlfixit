@@ -1,0 +1,247 @@
+{
+  "slug": "commercehub",
+  "name": "CommerceHub (E-Commerce)",
+  "ontology": {
+    "version": "1.0",
+    "database": {
+      "name": "CommerceHub",
+      "rdbms_type": "PostgreSQL",
+      "description": "Multi-tenant e-commerce orders, customer accounts, and product inventory database."
+    },
+    "schemas": [
+      {
+        "name": "sales",
+        "description": "Customer accounts, orders, and checkout line items"
+      },
+      {
+        "name": "inventory",
+        "description": "Warehouses, product catalog, and stock levels"
+      }
+    ],
+    "business_concepts": [
+      {
+        "name": "Customer",
+        "schema": "sales",
+        "table": "customers",
+        "key_column": "id",
+        "description": "Registered buyer account with contact and billing details"
+      },
+      {
+        "name": "Order",
+        "schema": "sales",
+        "table": "orders",
+        "key_column": "id",
+        "description": "Customer purchase order header record"
+      },
+      {
+        "name": "Product",
+        "schema": "inventory",
+        "table": "products",
+        "key_column": "id",
+        "description": "Catalog SKU item available for purchase"
+      }
+    ],
+    "tables": [
+      {
+        "schema": "sales",
+        "name": "customers",
+        "description": "Registered buyer accounts and profile metadata",
+        "columns": [
+          {
+            "name": "id",
+            "type": "serial",
+            "pk": true,
+            "description": "Unique customer ID"
+          },
+          {
+            "name": "email",
+            "type": "varchar(255)",
+            "pk": false,
+            "description": "Primary customer email"
+          },
+          {
+            "name": "full_name",
+            "type": "varchar(150)",
+            "pk": false,
+            "description": "Customer full name"
+          },
+          {
+            "name": "created_at",
+            "type": "timestamp",
+            "pk": false,
+            "description": "Account creation timestamp"
+          }
+        ]
+      },
+      {
+        "schema": "sales",
+        "name": "orders",
+        "description": "Customer order headers and fulfillment status",
+        "columns": [
+          {
+            "name": "id",
+            "type": "serial",
+            "pk": true,
+            "description": "Unique order ID"
+          },
+          {
+            "name": "customer_id",
+            "type": "int",
+            "pk": false,
+            "fk": {
+              "target_table": "sales.customers",
+              "target_column": "id"
+            },
+            "description": "Purchasing customer reference"
+          },
+          {
+            "name": "status",
+            "type": "varchar(50)",
+            "pk": false,
+            "description": "Order status: pending, paid, shipped"
+          },
+          {
+            "name": "total_amount",
+            "type": "decimal(12,2)",
+            "pk": false,
+            "description": "Order total in GBP"
+          },
+          {
+            "name": "placed_at",
+            "type": "timestamp",
+            "pk": false,
+            "description": "Checkout timestamp"
+          }
+        ]
+      },
+      {
+        "schema": "sales",
+        "name": "order_items",
+        "description": "Individual product line items within an order",
+        "columns": [
+          {
+            "name": "id",
+            "type": "serial",
+            "pk": true,
+            "description": "Line item ID"
+          },
+          {
+            "name": "order_id",
+            "type": "int",
+            "pk": false,
+            "fk": {
+              "target_table": "sales.orders",
+              "target_column": "id"
+            },
+            "description": "Parent order ID"
+          },
+          {
+            "name": "product_id",
+            "type": "int",
+            "pk": false,
+            "fk": {
+              "target_table": "inventory.products",
+              "target_column": "id"
+            },
+            "description": "Purchased product SKU ID"
+          },
+          {
+            "name": "quantity",
+            "type": "int",
+            "pk": false,
+            "description": "Units ordered"
+          },
+          {
+            "name": "unit_price",
+            "type": "decimal(12,2)",
+            "pk": false,
+            "description": "Captured unit price"
+          }
+        ]
+      },
+      {
+        "schema": "inventory",
+        "name": "products",
+        "description": "Master product catalog and pricing",
+        "columns": [
+          {
+            "name": "id",
+            "type": "serial",
+            "pk": true,
+            "description": "Product ID"
+          },
+          {
+            "name": "sku",
+            "type": "varchar(64)",
+            "pk": false,
+            "description": "Unique stock keeping unit code"
+          },
+          {
+            "name": "name",
+            "type": "varchar(255)",
+            "pk": false,
+            "description": "Display product title"
+          },
+          {
+            "name": "price",
+            "type": "decimal(12,2)",
+            "pk": false,
+            "description": "Current retail unit price"
+          },
+          {
+            "name": "is_active",
+            "type": "boolean",
+            "pk": false,
+            "description": "True if listed for sale"
+          }
+        ]
+      }
+    ],
+    "semantic_relationships": [
+      {
+        "name": "PLACED_BY_CUSTOMER",
+        "inverse_name": "PLACES_ORDERS",
+        "source_table": "sales.orders",
+        "target_table": "sales.customers",
+        "source_column": "customer_id",
+        "target_column": "id",
+        "cardinality": "N:1",
+        "forward_description": "Each order is placed by one registered customer account",
+        "reverse_description": "A customer can place zero or many orders over time",
+        "description": "[orders -> customers]: Each order is placed by one registered customer account | [customers -> orders]: A customer can place zero or many orders over time"
+      },
+      {
+        "name": "BELONGS_TO_ORDER",
+        "inverse_name": "HAS_ORDER_ITEMS",
+        "source_table": "sales.order_items",
+        "target_table": "sales.orders",
+        "source_column": "order_id",
+        "target_column": "id",
+        "cardinality": "N:1",
+        "forward_description": "Each order line item belongs to one parent order header",
+        "reverse_description": "An order header contains one or more purchased order line items",
+        "description": "[order_items -> orders]: Each order line item belongs to one parent order header | [orders -> order_items]: An order header contains one or more purchased order line items"
+      },
+      {
+        "name": "REFERENCES_PRODUCT",
+        "inverse_name": "ORDERED_IN_ITEMS",
+        "source_table": "sales.order_items",
+        "target_table": "inventory.products",
+        "source_column": "product_id",
+        "target_column": "id",
+        "cardinality": "N:1",
+        "forward_description": "Each order line item references a specific catalog product SKU",
+        "reverse_description": "A catalog product can appear across many customer order line items",
+        "description": "[order_items -> products]: Each order line item references a specific catalog product SKU | [products -> order_items]: A catalog product can appear across many customer order line items"
+      }
+    ],
+    "common_join_paths": [
+      {
+        "name": "Full Customer Order Breakdown",
+        "description": "Joins customers, orders, line items, and products for revenue reporting",
+        "sql": "SELECT\n    c.email,\n    o.id AS order_id,\n    o.status,\n    p.sku,\n    p.name AS product_name,\n    oi.quantity,\n    oi.unit_price\nFROM sales.orders o\nJOIN sales.customers c ON o.customer_id = c.id\nJOIN sales.order_items oi ON o.id = oi.order_id\nJOIN inventory.products p ON oi.product_id = p.id;"
+      }
+    ]
+  },
+  "positions": {}
+}

@@ -1,0 +1,17 @@
+services:
+  yamlfixit:
+    build: .
+    container_name: yamlfixit
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8076:8076"
+    volumes:
+      - ./snapshots:/app/snapshots
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    env_file:
+      - .env
+    environment:
+      - PORT=8076
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - ONTOLOGY_BRIDGE_URL=${ONTOLOGY_BRIDGE_URL:-http://host.docker.internal:8075}

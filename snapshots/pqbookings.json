@@ -1,0 +1,1395 @@
+{
+  "slug": "pqbookings",
+  "name": "PQBookings (Warehouse & Slots)",
+  "ontology": {
+    "version": "1.0",
+    "database": {
+      "name": "PQBookings",
+      "rdbms_type": "MySQL",
+      "description": "Enterprise warehouse slot booking, haulier reservation, capacity scheduling, and delivery audit system."
+    },
+    "schemas": [
+      {
+        "name": "facility",
+        "description": "Depot campuses, physical warehouse docks, holiday closures, and vehicle classifications"
+      },
+      {
+        "name": "scheduling",
+        "description": "Operational calendars, operating windows, slot generation, capacity rules, and overrides"
+      },
+      {
+        "name": "booking",
+        "description": "Vehicle arrival reservations, cargo pallets, tanker feedstocks, carrier tracking, and audit trails"
+      },
+      {
+        "name": "access",
+        "description": "Users, lead time notice groups, user-group memberships, and calendar access permissions"
+      }
+    ],
+    "tables": [
+      {
+        "schema": "facility",
+        "name": "locations",
+        "description": "Physical depot locations or campus sites",
+        "columns": [
+          {
+            "name": "id",
+            "type": "int",
+            "pk": true,
+            "description": "Location ID"
+          },
+          {
+            "name": "name",
+            "type": "varchar(255)",
+            "pk": false,
+            "description": "Location / depot name"
+          },
+          {
+            "name": "address",
+            "type": "text",
+            "pk": false,
+            "description": "Full physical street address"
+          },
+          {
+            "name": "created_at",
+            "type": "timestamp",
+            "pk": false,
+            "description": "Record creation timestamp"
+          },
+          {
+            "name": "updated_at",
+            "type": "timestamp",
+            "pk": false,
+            "description": "Record last modified timestamp"
+          }
+        ]
+      },
+      {
+        "schema": "facility",
+        "name": "warehouses",
+        "description": "Specific warehouse docks, units, or buildings within a depot location",
+        "columns": [
+          {
+            "name": "id",
+            "type": "int",
+            "pk": true,
+            "description": "Warehouse ID"
+          },
+          {
+            "name": "location_id",
+            "type": "int",
+            "pk": false,
+            "description": "Parent location ID",
+            "fk": {
+              "target_table": "facility.locations",
+              "target_column": "id"
+            }
+          },
+          {
+            "name": "name",
+            "type": "varchar(255)",
+            "pk": false,
+            "description": "Warehouse building / dock name"
+          },
+          {
+            "name": "address",
+            "type": "text",
+            "pk": false,
+            "description": "Specific unit address"
+          },
+          {
+            "name": "is_active",
+            "type": "tinyint(1)",
+            "pk": false,
+            "description": "Active status flag (1=active, 0=inactive)"
+          },
+          {
+            "name": "created_at",
+            "type": "timestamp",
+            "pk": false,
+            "description": "Created timestamp"
+          },
+          {
+            "name": "updated_at",
+            "type": "timestamp",
+            "pk": false,
+            "description": "Updated timestamp"
+          }
+        ]
+      },
+      {
+        "schema": "facility",
+        "name": "holidays",
+        "description": "Site closure dates and non-working bank holidays per depot",
+        "columns": [
+          {
+            "name": "id",
+            "type": "int",
+            "pk": true,
+            "description": "Holiday ID"
+          },
+          {
+            "name": "location_id",
+            "type": "int",
+            "pk": false,
+            "description": "Location ID",
+            "fk": {
+              "target_table": "facility.locations",
+              "target_column": "id"
+            }
+          },
+          {
+            "name": "date",
+            "type": "date",
+            "pk": false,
+            "description": "Observed holiday date"
+          },
+          {
+            "name": "name",
+            "type": "varchar(255)",
+            "pk": false,
+            "description": "Holiday name / description"
+          },
+          {
+            "name": "description",
+            "type": "text",
+            "pk": false,
+            "description": "Additional notes"
+          },
+          {
+            "name": "created_at",
+            "type": "timestamp",
+            "pk": false,
+            "description": "Created timestamp"
+          },
+          {
+            "name": "updated_at",
+            "type": "timestamp",
+            "pk": false,
+            "description": "Updated timestamp"
+          }
+        ]
+      },
+      {
+        "schema": "facility",
+        "name": "vehicle_types",
+        "description": "Master list of vehicle transport classifications",
+        "columns": [
+          {
+            "name": "id",
+            "type": "int",
+            "pk": true,
+            "description": "Vehicle type ID"
+          },
+          {
+            "name": "name",
+            "type": "varchar(100)",
+            "pk": false,
+            "description": "Vehicle classification (e.g. Artic, Rigid, Van, Tanker)"
+          },
+          {
+            "name": "is_active",
+            "type": "tinyint(1)",
+            "pk": false,
+            "description": "Active status flag"
+          },
+          {
+            "name": "created_at",
+            "type": "timestamp",
+            "pk": false,
+            "description": "Created timestamp"
+          },
+          {
+            "name": "updated_at",
+            "type": "timestamp",
+            "pk": false,
+            "description": "Updated timestamp"
+          }
+        ]
+      },
+      {
+        "schema": "facility",
+        "name": "calendar",
+        "description": "Legacy lookup mapping external locationid string to calendar name",
+        "columns": [
+          {
+            "name": "id",
+            "type": "int",
+            "pk": true,
+            "description": "Identifier"
+          },
+          {
+            "name": "locationid",
+            "type": "varchar(150)",
+            "pk": false,
+            "description": "External location identifier string"
+          },
+          {
+            "name": "name",
+            "type": "varchar(150)",
+            "pk": false,
+            "description": "Calendar title"
+          }
+        ]
+      },
+      {
+        "schema": "scheduling",
+        "name": "calendars",
+        "description": "Warehouse booking schedules, opening windows, slot intervals, and capacity limits",
+        "columns": [
+          {
+            "name": "id",
+            "type": "int",
+            "pk": true,
+            "description": "Calendar ID"
+          },
+          {
+            "name": "warehouse_id",
+            "type": "int",
+            "pk": false,
+            "description": "Parent warehouse ID",
+            "fk": {
+              "target_table": "facility.warehouses",
+              "target_column": "id"
+            }
+          },
+          {
+            "name": "name",
+            "type": "varchar(255)",
+            "pk": false,
+            "description": "Calendar name"
+          },
+          {
+            "name": "description",
+            "type": "text",
+            "pk": false,
+            "description": "Calendar description and rules"
+          },
+          {
+            "name": "is_active",
+            "type": "tinyint(1)",
+            "pk": false,
+            "description": "Active status flag"
+          },
+          {
+            "name": "created_at",
+            "type": "timestamp",
+            "pk": false,
+            "description": "Created timestamp"
+          },
+          {
+            "name": "updated_at",
+            "type": "timestamp",
+            "pk": false,
+            "description": "Updated timestamp"
+          },
+          {
+            "name": "slot_generation_type",
+            "type": "varchar(20)",
+            "pk": false,
+            "description": "Generation method: 'time' (interval slots) or 'number' (daily capacity)"
+          },
+          {
+            "name": "day_start_time",
+            "type": "time",
+            "pk": false,
+            "description": "Day operational start time"
+          },
+          {
+            "name": "day_end_time",
+            "type": "time",
+            "pk": false,
+            "description": "Day operational end time"
+          },
+          {
+            "name": "slot_interval_minutes",
+            "type": "int",
+            "pk": false,
+            "description": "Slot length in minutes for time-based generation"
+          },
+          {
+            "name": "default_slot_count",
+            "type": "int",
+            "pk": false,
+            "description": "Slot count for number-based generation"
+          },
+          {
+            "name": "default_min_pallets",
+            "type": "int",
+            "pk": false,
+            "description": "Minimum pallets required per slot"
+          },
+          {
+            "name": "default_max_pallets",
+            "type": "int",
+            "pk": false,
+            "description": "Maximum pallets permitted per slot"
+          },
+          {
+            "name": "default_max_pallets_per_day",
+            "type": "int",
+            "pk": false,
+            "description": "Maximum aggregate pallets permitted per day"
+          },
+          {
+            "name": "default_is_tanker",
+            "type": "tinyint(1)",
+            "pk": false,
+            "description": "1 if calendar is designated for tanker/bulk liquid slots"
+          },
+          {
+            "name": "available_days",
+            "type": "json",
+            "pk": false,
+            "description": "JSON array of operational day indices (0=Monday, 6=Sunday)"
+          },
+          {
+            "name": "calendar_type",
+            "type": "varchar(20)",
+            "pk": false,
+            "description": "Calendar type: 'collection' (with pallet limits) or 'delivery' (unrestricted)"
+          }
+        ]
+      },
+      {
+        "schema": "scheduling",
+        "name": "slots",
+        "description": "Discrete capacity slots and time blocks generated for specific calendar dates",
+        "columns": [
+          {
+            "name": "id",
+            "type": "int",
+            "pk": true,
+            "description": "Slot ID"
+          },
+          {
+            "name": "calendar_id",
+            "type": "int",
+            "pk": false,
+            "description": "Parent calendar ID",
+            "fk": {
+              "target_table": "scheduling.calendars",
+              "target_column": "id"
+            }
+          },
+          {
+            "name": "slot_type",
+            "type": "varchar(20)",
+            "pk": false,
+            "description": "Slot mode: 'time' or 'number'"
+          },
+          {
+            "name": "date",
+            "type": "date",
+            "pk": false,
+            "description": "Slot operational date"
+          },
+          {
+            "name": "slot_count",
+            "type": "int",
+            "pk": false,
+            "description": "Available vehicle count (number-based)"
+          },
+          {
+            "name": "start_time",
+            "type": "time",
+            "pk": false,
+            "description": "Window start time"
+          },
+          {
+            "name": "end_time",
+            "type": "time",
+            "pk": false,
+            "description": "Window end time"
+          },
+          {
+            "name": "slot_duration_minutes",
+            "type": "int",
+            "pk": false,
+            "description": "Duration in minutes"
+          },
+          {
+            "name": "is_active",
+            "type": "tinyint(1)",
+            "pk": false,
+            "description": "Active status flag"
+          },
+          {
+            "name": "created_at",
+            "type": "timestamp",
+            "pk": false,
+            "description": "Created timestamp"
+          },
+          {
+            "name": "updated_at",
+            "type": "timestamp",
+            "pk": false,
+            "description": "Updated timestamp"
+          },
+          {
+            "name": "min_pallets",
+            "type": "int",
+            "pk": false,
+            "description": "Minimum pallets for this slot"
+          },
+          {
+            "name": "max_pallets",
+            "type": "int",
+            "pk": false,
+            "description": "Maximum pallets for this slot"
+          },
+          {
+            "name": "is_tanker",
+            "type": "tinyint(1)",
+            "pk": false,
+            "description": "1 if slot accepts tanker bookings"
+          },
+          {
+            "name": "max_pallets_per_day",
+            "type": "int",
+            "pk": false,
+            "description": "Daily maximum aggregate pallets"
+          },
+          {
+            "name": "effective_from",
+            "type": "date",
+            "pk": false,
+            "description": "Rule effective start date"
+          },
+          {
+            "name": "effective_to",
+            "type": "date",
+            "pk": false,
+            "description": "Rule effective end date"
+          },
+          {
+            "name": "is_override",
+            "type": "tinyint(1)",
+            "pk": false,
+            "description": "1 if manually overridden slot"
+          },
+          {
+            "name": "notes",
+            "type": "text",
+            "pk": false,
+            "description": "Slot notes"
+          }
+        ]
+      },
+      {
+        "schema": "scheduling",
+        "name": "slot_config_changes",
+        "description": "Audit and schedule of permanent or temporary rule overrides on calendars",
+        "columns": [
+          {
+            "name": "id",
+            "type": "int",
+            "pk": true,
+            "description": "Change record ID"
+          },
+          {
+            "name": "calendar_id",
+            "type": "int",
+            "pk": false,
+            "description": "Target calendar ID",
+            "fk": {
+              "target_table": "scheduling.calendars",
+              "target_column": "id"
+            }
+          },
+          {
+            "name": "change_type",
+            "type": "varchar(20)",
+            "pk": false,
+            "description": "'permanent' (updates calendar defaults) or 'temporary' (date override)"
+          },
+          {
+            "name": "effective_from",
+            "type": "date",
+            "pk": false,
+            "description": "Override start date"
+          },
+          {
+            "name": "effective_to",
+            "type": "date",
+            "pk": false,
+            "description": "Override end date (NULL if indefinite/permanent)"
+          },
+          {
+            "name": "slot_generation_type",
+            "type": "varchar(20)",
+            "pk": false,
+            "description": "Override slot generation type"
+          },
+          {
+            "name": "day_start_time",
+            "type": "time",
+            "pk": false,
+            "description": "Override start time"
+          },
+          {
+            "name": "day_end_time",
+            "type": "time",
+            "pk": false,
+            "description": "Override end time"
+          },
+          {
+            "name": "slot_interval_minutes",
+            "type": "int",
+            "pk": false,
+            "description": "Override interval"
+          },
+          {
+            "name": "default_slot_count",
+            "type": "int",
+            "pk": false,
+            "description": "Override slot count"
+          },
+          {
+            "name": "default_min_pallets",
+            "type": "int",
+            "pk": false,
+            "description": "Override min pallets"
+          },
+          {
+            "name": "default_max_pallets",
+            "type": "int",
+            "pk": false,
+            "description": "Override max pallets"
+          },
+          {
+            "name": "default_max_pallets_per_day",
+            "type": "int",
+            "pk": false,
+            "description": "Override max daily pallets"
+          },
+          {
+            "name": "default_is_tanker",
+            "type": "tinyint(1)",
+            "pk": false,
+            "description": "Override tanker setting"
+          },
+          {
+            "name": "created_by_user_id",
+            "type": "int",
+            "pk": false,
+            "description": "Admin user who made the change",
+            "fk": {
+              "target_table": "access.users",
+              "target_column": "id"
+            }
+          },
+          {
+            "name": "notes",
+            "type": "text",
+            "pk": false,
+            "description": "Admin rationale"
+          },
+          {
+            "name": "is_active",
+            "type": "tinyint(1)",
+            "pk": false,
+            "description": "Active flag"
+          },
+          {
+            "name": "created_at",
+            "type": "timestamp",
+            "pk": false,
+            "description": "Created timestamp"
+          },
+          {
+            "name": "updated_at",
+            "type": "timestamp",
+            "pk": false,
+            "description": "Updated timestamp"
+          }
+        ]
+      },
+      {
+        "schema": "booking",
+        "name": "bookings",
+        "description": "Core booking reservation entity representing confirmed or pending arrival at a slot",
+        "columns": [
+          {
+            "name": "id",
+            "type": "int",
+            "pk": true,
+            "description": "Booking ID"
+          },
+          {
+            "name": "user_id",
+            "type": "int",
+            "pk": false,
+            "description": "User who placed the booking",
+            "fk": {
+              "target_table": "access.users",
+              "target_column": "id"
+            }
+          },
+          {
+            "name": "slot_id",
+            "type": "int",
+            "pk": false,
+            "description": "Reserved slot ID",
+            "fk": {
+              "target_table": "scheduling.slots",
+              "target_column": "id"
+            }
+          },
+          {
+            "name": "booking_time_start",
+            "type": "time",
+            "pk": false,
+            "description": "Specific booking arrival time"
+          },
+          {
+            "name": "booking_time_end",
+            "type": "time",
+            "pk": false,
+            "description": "Specific booking departure time"
+          },
+          {
+            "name": "status",
+            "type": "varchar(20)",
+            "pk": false,
+            "description": "Booking lifecycle: 'pending', 'confirmed', 'cancelled', 'completed'"
+          },
+          {
+            "name": "notes",
+            "type": "text",
+            "pk": false,
+            "description": "General booking notes"
+          },
+          {
+            "name": "created_at",
+            "type": "timestamp",
+            "pk": false,
+            "description": "Created timestamp"
+          },
+          {
+            "name": "updated_at",
+            "type": "timestamp",
+            "pk": false,
+            "description": "Updated timestamp"
+          },
+          {
+            "name": "pallets",
+            "type": "int",
+            "pk": false,
+            "description": "Number of pallets booked"
+          },
+          {
+            "name": "haulier_carrier",
+            "type": "varchar(255)",
+            "pk": false,
+            "description": "Haulier / transport carrier company name"
+          },
+          {
+            "name": "driver_tel",
+            "type": "varchar(50)",
+            "pk": false,
+            "description": "Driver contact telephone number"
+          },
+          {
+            "name": "delivery_number",
+            "type": "varchar(100)",
+            "pk": false,
+            "description": "Delivery / consignment number"
+          },
+          {
+            "name": "confirm_delivery_number",
+            "type": "varchar(100)",
+            "pk": false,
+            "description": "Confirmed delivery number"
+          },
+          {
+            "name": "carrier_ref",
+            "type": "varchar(255)",
+            "pk": false,
+            "description": "Carrier reference code"
+          },
+          {
+            "name": "destination",
+            "type": "varchar(255)",
+            "pk": false,
+            "description": "Destination location"
+          },
+          {
+            "name": "country",
+            "type": "varchar(100)",
+            "pk": false,
+            "description": "Destination country"
+          },
+          {
+            "name": "vehicle_type",
+            "type": "varchar(100)",
+            "pk": false,
+            "description": "Vehicle type"
+          },
+          {
+            "name": "confirm_details",
+            "type": "tinyint(1)",
+            "pk": false,
+            "description": "Details confirmed checkbox"
+          },
+          {
+            "name": "comments",
+            "type": "text",
+            "pk": false,
+            "description": "Additional comments / delivery notes"
+          },
+          {
+            "name": "feedstock_sku",
+            "type": "varchar(100)",
+            "pk": false,
+            "description": "Feedstock SKU for tanker bookings"
+          },
+          {
+            "name": "feedstock_product_name",
+            "type": "varchar(255)",
+            "pk": false,
+            "description": "Feedstock product name for tanker bookings"
+          },
+          {
+            "name": "load_date",
+            "type": "date",
+            "pk": false,
+            "description": "Load date for tanker bookings"
+          },
+          {
+            "name": "delivery_date",
+            "type": "date",
+            "pk": false,
+            "description": "Delivery date for tanker bookings"
+          }
+        ]
+      },
+      {
+        "schema": "booking",
+        "name": "booking_audit",
+        "description": "Historical audit trail of booking creations, edits, cancellations, and restorations",
+        "columns": [
+          {
+            "name": "id",
+            "type": "int",
+            "pk": true,
+            "description": "Audit entry ID"
+          },
+          {
+            "name": "booking_id",
+            "type": "int",
+            "pk": false,
+            "description": "Target booking ID",
+            "fk": {
+              "target_table": "booking.bookings",
+              "target_column": "id"
+            }
+          },
+          {
+            "name": "changed_by_user_id",
+            "type": "int",
+            "pk": false,
+            "description": "User ID who made modification",
+            "fk": {
+              "target_table": "access.users",
+              "target_column": "id"
+            }
+          },
+          {
+            "name": "change_type",
+            "type": "varchar(20)",
+            "pk": false,
+            "description": "'created', 'updated', 'cancelled', 'restored'"
+          },
+          {
+            "name": "old_values",
+            "type": "json",
+            "pk": false,
+            "description": "Previous booking values snapshot as JSON"
+          },
+          {
+            "name": "new_values",
+            "type": "json",
+            "pk": false,
+            "description": "New booking values snapshot as JSON"
+          },
+          {
+            "name": "changed_fields",
+            "type": "text",
+            "pk": false,
+            "description": "Comma-separated list of modified field names"
+          },
+          {
+            "name": "notes",
+            "type": "text",
+            "pk": false,
+            "description": "Audit notes"
+          },
+          {
+            "name": "created_at",
+            "type": "timestamp",
+            "pk": false,
+            "description": "Timestamp of audit event"
+          }
+        ]
+      },
+      {
+        "schema": "access",
+        "name": "users",
+        "description": "System user accounts for customers, hauliers, warehouse operators, and administrators",
+        "columns": [
+          {
+            "name": "id",
+            "type": "int",
+            "pk": true,
+            "description": "User ID"
+          },
+          {
+            "name": "username",
+            "type": "varchar(150)",
+            "pk": false,
+            "description": "Login username"
+          },
+          {
+            "name": "email",
+            "type": "varchar(255)",
+            "pk": false,
+            "description": "User email address"
+          },
+          {
+            "name": "password_hash",
+            "type": "varchar(255)",
+            "pk": false,
+            "description": "Hashed password"
+          },
+          {
+            "name": "company_name",
+            "type": "varchar(255)",
+            "pk": false,
+            "description": "Company / organisation name"
+          },
+          {
+            "name": "contact_number",
+            "type": "varchar(20)",
+            "pk": false,
+            "description": "Contact phone number"
+          },
+          {
+            "name": "is_approved",
+            "type": "tinyint(1)",
+            "pk": false,
+            "description": "Approval status for booking"
+          },
+          {
+            "name": "is_admin",
+            "type": "tinyint(1)",
+            "pk": false,
+            "description": "System administrator flag"
+          },
+          {
+            "name": "is_warehouse_operator",
+            "type": "tinyint(1)",
+            "pk": false,
+            "description": "Warehouse dock operator flag"
+          },
+          {
+            "name": "can_search_bookings",
+            "type": "tinyint(1)",
+            "pk": false,
+            "description": "Global booking search privilege flag"
+          },
+          {
+            "name": "created_at",
+            "type": "timestamp",
+            "pk": false,
+            "description": "Account creation timestamp"
+          }
+        ]
+      },
+      {
+        "schema": "access",
+        "name": "groups",
+        "description": "User policy groups configuring booking advance lead time windows and notice periods",
+        "columns": [
+          {
+            "name": "id",
+            "type": "int",
+            "pk": true,
+            "description": "Group ID"
+          },
+          {
+            "name": "name",
+            "type": "varchar(255)",
+            "pk": false,
+            "description": "Group policy name"
+          },
+          {
+            "name": "description",
+            "type": "text",
+            "pk": false,
+            "description": "Group policy description"
+          },
+          {
+            "name": "booking_min_days",
+            "type": "int",
+            "pk": false,
+            "description": "Minimum days in future to book (lead time)"
+          },
+          {
+            "name": "booking_max_days",
+            "type": "int",
+            "pk": false,
+            "description": "Maximum days in future to book"
+          },
+          {
+            "name": "edit_min_days",
+            "type": "int",
+            "pk": false,
+            "description": "Minimum days notice required to edit booking"
+          },
+          {
+            "name": "edit_max_days",
+            "type": "int",
+            "pk": false,
+            "description": "Maximum days in future allowed to edit booking"
+          },
+          {
+            "name": "cancel_min_days",
+            "type": "int",
+            "pk": false,
+            "description": "Minimum days notice required to cancel booking"
+          },
+          {
+            "name": "is_active",
+            "type": "tinyint(1)",
+            "pk": false,
+            "description": "Active status flag"
+          },
+          {
+            "name": "created_at",
+            "type": "timestamp",
+            "pk": false,
+            "description": "Created timestamp"
+          },
+          {
+            "name": "updated_at",
+            "type": "timestamp",
+            "pk": false,
+            "description": "Updated timestamp"
+          }
+        ]
+      },
+      {
+        "schema": "access",
+        "name": "user_groups",
+        "description": "Junction table mapping users to policy groups",
+        "columns": [
+          {
+            "name": "id",
+            "type": "int",
+            "pk": true,
+            "description": "Association ID"
+          },
+          {
+            "name": "user_id",
+            "type": "int",
+            "pk": false,
+            "description": "User ID",
+            "fk": {
+              "target_table": "access.users",
+              "target_column": "id"
+            }
+          },
+          {
+            "name": "group_id",
+            "type": "int",
+            "pk": false,
+            "description": "Group ID",
+            "fk": {
+              "target_table": "access.groups",
+              "target_column": "id"
+            }
+          },
+          {
+            "name": "created_at",
+            "type": "timestamp",
+            "pk": false,
+            "description": "Created timestamp"
+          }
+        ]
+      },
+      {
+        "schema": "access",
+        "name": "group_calendar_access",
+        "description": "Junction table authorizing specific user groups to access and book specific calendars",
+        "columns": [
+          {
+            "name": "id",
+            "type": "int",
+            "pk": true,
+            "description": "Entitlement ID"
+          },
+          {
+            "name": "group_id",
+            "type": "int",
+            "pk": false,
+            "description": "Authorizing group ID",
+            "fk": {
+              "target_table": "access.groups",
+              "target_column": "id"
+            }
+          },
+          {
+            "name": "calendar_id",
+            "type": "int",
+            "pk": false,
+            "description": "Accessible calendar ID",
+            "fk": {
+              "target_table": "scheduling.calendars",
+              "target_column": "id"
+            }
+          },
+          {
+            "name": "created_at",
+            "type": "timestamp",
+            "pk": false,
+            "description": "Created timestamp"
+          }
+        ]
+      },
+      {
+        "schema": "access",
+        "name": "password_reset_tokens",
+        "description": "Authentication tokens for password recovery",
+        "columns": [
+          {
+            "name": "id",
+            "type": "int",
+            "pk": true,
+            "description": "Token ID"
+          },
+          {
+            "name": "user_id",
+            "type": "int",
+            "pk": false,
+            "description": "User ID",
+            "fk": {
+              "target_table": "access.users",
+              "target_column": "id"
+            }
+          },
+          {
+            "name": "token_hash",
+            "type": "varchar(64)",
+            "pk": false,
+            "description": "SHA-256 token hash"
+          },
+          {
+            "name": "expires_at",
+            "type": "datetime",
+            "pk": false,
+            "description": "Token expiry timestamp"
+          },
+          {
+            "name": "used_at",
+            "type": "datetime",
+            "pk": false,
+            "description": "Consumed timestamp"
+          },
+          {
+            "name": "created_at",
+            "type": "timestamp",
+            "pk": false,
+            "description": "Created timestamp"
+          }
+        ]
+      }
+    ],
+    "semantic_relationships": [
+      {
+        "name": "LOCATED_AT",
+        "inverse_name": "HAS_WAREHOUSES",
+        "source_table": "facility.warehouses",
+        "target_table": "facility.locations",
+        "source_column": "location_id",
+        "target_column": "id",
+        "cardinality": "N:1",
+        "forward_description": "Warehouse is physically located within depot location",
+        "reverse_description": "Each location can have multiple associated warehouses records",
+        "description": "[warehouses -> locations]: Warehouse is physically located within depot location | [locations -> warehouses]: Each location can have multiple associated warehouses records"
+      },
+      {
+        "name": "OBSERVED_AT",
+        "inverse_name": "HAS_HOLIDAYS",
+        "source_table": "facility.holidays",
+        "target_table": "facility.locations",
+        "source_column": "location_id",
+        "target_column": "id",
+        "cardinality": "N:1",
+        "forward_description": "Non-operational holiday observed at depot location",
+        "reverse_description": "Each location can have multiple associated holidays records",
+        "description": "[holidays -> locations]: Non-operational holiday observed at depot location | [locations -> holidays]: Each location can have multiple associated holidays records"
+      },
+      {
+        "name": "OPERATED_BY_WAREHOUSE",
+        "inverse_name": "HAS_CALENDARS",
+        "source_table": "scheduling.calendars",
+        "target_table": "facility.warehouses",
+        "source_column": "warehouse_id",
+        "target_column": "id",
+        "cardinality": "N:1",
+        "forward_description": "Booking calendar operated by warehouse dock",
+        "reverse_description": "Each warehouse can have multiple associated calendars records",
+        "description": "[calendars -> warehouses]: Booking calendar operated by warehouse dock | [warehouses -> calendars]: Each warehouse can have multiple associated calendars records"
+      },
+      {
+        "name": "SCHEDULED_ON_CALENDAR",
+        "inverse_name": "HAS_SLOTS",
+        "source_table": "scheduling.slots",
+        "target_table": "scheduling.calendars",
+        "source_column": "calendar_id",
+        "target_column": "id",
+        "cardinality": "N:1",
+        "forward_description": "Capacity slot scheduled under calendar",
+        "reverse_description": "Each calendar can have multiple associated slots records",
+        "description": "[slots -> calendars]: Capacity slot scheduled under calendar | [calendars -> slots]: Each calendar can have multiple associated slots records"
+      },
+      {
+        "name": "CONFIGURES_CALENDAR",
+        "inverse_name": "HAS_SLOT_CONFIG_CHANGES",
+        "source_table": "scheduling.slot_config_changes",
+        "target_table": "scheduling.calendars",
+        "source_column": "calendar_id",
+        "target_column": "id",
+        "cardinality": "N:1",
+        "forward_description": "Slot rule override applied to calendar",
+        "reverse_description": "Each calendar can have multiple associated slot config changes records",
+        "description": "[slot_config_changes -> calendars]: Slot rule override applied to calendar | [calendars -> slot_config_changes]: Each calendar can have multiple associated slot config changes records"
+      },
+      {
+        "name": "CONFIGURED_BY_USER",
+        "inverse_name": "HAS_SLOT_CONFIG_CHANGES",
+        "source_table": "scheduling.slot_config_changes",
+        "target_table": "access.users",
+        "source_column": "created_by_user_id",
+        "target_column": "id",
+        "cardinality": "N:1",
+        "forward_description": "Slot configuration override authored by admin user",
+        "reverse_description": "Each user can have multiple associated slot config changes records",
+        "description": "[slot_config_changes -> users]: Slot configuration override authored by admin user | [users -> slot_config_changes]: Each user can have multiple associated slot config changes records"
+      },
+      {
+        "name": "USER_MEMBER_OF",
+        "inverse_name": "HAS_USER_GROUPS",
+        "source_table": "access.user_groups",
+        "target_table": "access.users",
+        "source_column": "user_id",
+        "target_column": "id",
+        "cardinality": "N:1",
+        "forward_description": "User membership assignment",
+        "reverse_description": "Each user can have multiple associated user groups records",
+        "description": "[user_groups -> users]: User membership assignment | [users -> user_groups]: Each user can have multiple associated user groups records"
+      },
+      {
+        "name": "GROUP_CONTAINS_USER",
+        "inverse_name": "HAS_USER_GROUPS",
+        "source_table": "access.user_groups",
+        "target_table": "access.groups",
+        "source_column": "group_id",
+        "target_column": "id",
+        "cardinality": "N:1",
+        "forward_description": "Policy group contains user",
+        "reverse_description": "Each group can have multiple associated user groups records",
+        "description": "[user_groups -> groups]: Policy group contains user | [groups -> user_groups]: Each group can have multiple associated user groups records"
+      },
+      {
+        "name": "GRANTS_ACCESS_FROM_GROUP",
+        "inverse_name": "HAS_GROUP_CALENDAR_ACCESS",
+        "source_table": "access.group_calendar_access",
+        "target_table": "access.groups",
+        "source_column": "group_id",
+        "target_column": "id",
+        "cardinality": "N:1",
+        "forward_description": "Access authorization granted by policy group",
+        "reverse_description": "Each group can have multiple associated group calendar access records",
+        "description": "[group_calendar_access -> groups]: Access authorization granted by policy group | [groups -> group_calendar_access]: Each group can have multiple associated group calendar access records"
+      },
+      {
+        "name": "GRANTS_ACCESS_TO_CALENDAR",
+        "inverse_name": "HAS_GROUP_CALENDAR_ACCESS",
+        "source_table": "access.group_calendar_access",
+        "target_table": "scheduling.calendars",
+        "source_column": "calendar_id",
+        "target_column": "id",
+        "cardinality": "N:1",
+        "forward_description": "Calendar accessible by policy group",
+        "reverse_description": "Each calendar can have multiple associated group calendar access records",
+        "description": "[group_calendar_access -> calendars]: Calendar accessible by policy group | [calendars -> group_calendar_access]: Each calendar can have multiple associated group calendar access records"
+      },
+      {
+        "name": "TOKEN_FOR_USER",
+        "inverse_name": "HAS_PASSWORD_RESET_TOKENS",
+        "source_table": "access.password_reset_tokens",
+        "target_table": "access.users",
+        "source_column": "user_id",
+        "target_column": "id",
+        "cardinality": "N:1",
+        "forward_description": "Password reset token belonging to user",
+        "reverse_description": "Each user can have multiple associated password reset tokens records",
+        "description": "[password_reset_tokens -> users]: Password reset token belonging to user | [users -> password_reset_tokens]: Each user can have multiple associated password reset tokens records"
+      },
+      {
+        "name": "BOOKED_BY_USER",
+        "inverse_name": "HAS_BOOKINGS",
+        "source_table": "booking.bookings",
+        "target_table": "access.users",
+        "source_column": "user_id",
+        "target_column": "id",
+        "cardinality": "N:1",
+        "forward_description": "Booking placed by haulier / user",
+        "reverse_description": "Each user can have multiple associated bookings records",
+        "description": "[bookings -> users]: Booking placed by haulier / user | [users -> bookings]: Each user can have multiple associated bookings records"
+      },
+      {
+        "name": "RESERVED_IN_SLOT",
+        "inverse_name": "HAS_BOOKINGS",
+        "source_table": "booking.bookings",
+        "target_table": "scheduling.slots",
+        "source_column": "slot_id",
+        "target_column": "id",
+        "cardinality": "N:1",
+        "forward_description": "Booking reserved in capacity slot",
+        "reverse_description": "Each slot can have multiple associated bookings records",
+        "description": "[bookings -> slots]: Booking reserved in capacity slot | [slots -> bookings]: Each slot can have multiple associated bookings records"
+      },
+      {
+        "name": "AUDITS_BOOKING",
+        "inverse_name": "HAS_BOOKING_AUDIT",
+        "source_table": "booking.booking_audit",
+        "target_table": "booking.bookings",
+        "source_column": "booking_id",
+        "target_column": "id",
+        "cardinality": "N:1",
+        "forward_description": "Audit trail log for booking",
+        "reverse_description": "Each booking can have multiple associated booking audit records",
+        "description": "[booking_audit -> bookings]: Audit trail log for booking | [bookings -> booking_audit]: Each booking can have multiple associated booking audit records"
+      },
+      {
+        "name": "MODIFIED_BY_USER",
+        "inverse_name": "HAS_BOOKING_AUDIT",
+        "source_table": "booking.booking_audit",
+        "target_table": "access.users",
+        "source_column": "changed_by_user_id",
+        "target_column": "id",
+        "cardinality": "N:1",
+        "forward_description": "Booking audit change performed by user",
+        "reverse_description": "Each user can have multiple associated booking audit records",
+        "description": "[booking_audit -> users]: Booking audit change performed by user | [users -> booking_audit]: Each user can have multiple associated booking audit records"
+      }
+    ],
+    "business_concepts": [
+      {
+        "name": "DepotLocation",
+        "schema": "facility",
+        "table": "locations",
+        "key_column": "id",
+        "description": "Geographic depot or facility campus hosting warehouse buildings"
+      },
+      {
+        "name": "Warehouse",
+        "schema": "facility",
+        "table": "warehouses",
+        "key_column": "id",
+        "description": "Physical warehouse dock or building operating loading bays"
+      },
+      {
+        "name": "LocationHoliday",
+        "schema": "facility",
+        "table": "holidays",
+        "key_column": "id",
+        "description": "Non-operational dates and public closures observed by a depot"
+      },
+      {
+        "name": "VehicleType",
+        "schema": "facility",
+        "table": "vehicle_types",
+        "key_column": "id",
+        "description": "Master list of vehicle classifications (Artic, Rigid, Van, Tanker)"
+      },
+      {
+        "name": "BookingCalendar",
+        "schema": "scheduling",
+        "table": "calendars",
+        "key_column": "id",
+        "description": "Capacity calendar defining working hours, slot intervals, and collection vs delivery rules"
+      },
+      {
+        "name": "CapacitySlot",
+        "schema": "scheduling",
+        "table": "slots",
+        "key_column": "id",
+        "description": "Discrete time slot or numbered capacity bucket available for vehicle booking"
+      },
+      {
+        "name": "SlotRuleOverride",
+        "schema": "scheduling",
+        "table": "slot_config_changes",
+        "key_column": "id",
+        "description": "Permanent defaults changes or temporary date-specific overrides to calendar slot generation"
+      },
+      {
+        "name": "ArrivalBooking",
+        "schema": "booking",
+        "table": "bookings",
+        "key_column": "id",
+        "description": "Confirmed or pending vehicle reservation for pallet loading/unloading or liquid tanker feedstock"
+      },
+      {
+        "name": "BookingAuditRecord",
+        "schema": "booking",
+        "table": "booking_audit",
+        "key_column": "id",
+        "description": "Historical change log capturing previous and new JSON states of bookings"
+      },
+      {
+        "name": "SystemUser",
+        "schema": "access",
+        "table": "users",
+        "key_column": "id",
+        "description": "User account representing hauliers, logistics coordinators, warehouse operators, and admins"
+      },
+      {
+        "name": "BookingPolicyGroup",
+        "schema": "access",
+        "table": "groups",
+        "key_column": "id",
+        "description": "Customer or haulier group governing booking lead times (min/max days to book, edit, or cancel)"
+      },
+      {
+        "name": "GroupCalendarEntitlement",
+        "schema": "access",
+        "table": "group_calendar_access",
+        "key_column": "id",
+        "description": "Explicit access authorization granting a policy group rights to view and book a calendar"
+      }
+    ],
+    "common_join_paths": [
+      {
+        "name": "Full Booking Lineage",
+        "description": "Traverse from individual booking up to warehouse, location, and user",
+        "sql": "SELECT \n    b.id AS booking_id,\n    b.status,\n    b.pallets,\n    b.haulier_carrier,\n    b.delivery_number,\n    b.destination,\n    b.vehicle_type,\n    s.date AS booking_date,\n    s.start_time AS slot_start,\n    s.end_time AS slot_end,\n    c.name AS calendar_name,\n    c.calendar_type,\n    w.name AS warehouse_name,\n    l.name AS location_name,\n    u.username,\n    u.company_name\nFROM bookings b\nJOIN slots s ON b.slot_id = s.id\nJOIN calendars c ON s.calendar_id = c.id\nJOIN warehouses w ON c.warehouse_id = w.id\nJOIN locations l ON w.location_id = l.id\nJOIN users u ON b.user_id = u.id;"
+      },
+      {
+        "name": "User Calendar Permission Check",
+        "description": "Determine whether a user has entitlement to book a given calendar based on group rules",
+        "sql": "SELECT \n    u.username,\n    u.company_name,\n    g.name AS group_name,\n    g.booking_min_days,\n    g.booking_max_days,\n    c.name AS accessible_calendar,\n    w.name AS warehouse_name\nFROM users u\nJOIN user_groups ug ON u.id = ug.user_id\nJOIN groups g ON ug.group_id = g.id\nJOIN group_calendar_access gca ON g.id = gca.group_id\nJOIN calendars c ON gca.calendar_id = c.id\nJOIN warehouses w ON c.warehouse_id = w.id;"
+      },
+      {
+        "name": "Daily Pallet Capacity Utilization",
+        "description": "Compare total pallets booked against the daily max pallets limit per calendar",
+        "sql": "SELECT \n    c.name AS calendar_name,\n    s.date,\n    c.default_max_pallets_per_day AS calendar_daily_limit,\n    s.max_pallets_per_day AS slot_daily_limit,\n    COUNT(b.id) AS total_bookings,\n    SUM(COALESCE(b.pallets, 0)) AS total_pallets_booked\nFROM calendars c\nJOIN slots s ON c.id = s.calendar_id\nLEFT JOIN bookings b ON s.id = b.slot_id AND b.status IN ('confirmed', 'completed')\nGROUP BY c.id, c.name, s.date, c.default_max_pallets_per_day, s.max_pallets_per_day;"
+      }
+    ]
+  },
+  "positions": {}
+}
