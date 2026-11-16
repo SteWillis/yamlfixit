@@ -1,6 +1,6 @@
 {
   "slug": "commercehub",
-  "name": "CommerceHub (E-Commerce)",
+  "name": "CommerceHub (4 tables)",
   "ontology": {
     "version": "1.0",
     "database": {
@@ -243,5 +243,22 @@
       }
     ]
   },
-  "positions": {}
+  "positions": {
+    "inventory.products": {
+      "x": 48,
+      "y": 44
+    },
+    "sales.customers": {
+      "x": 48,
+      "y": 270
+    },
+    "sales.orders": {
+      "x": 393,
+      "y": 44
+    },
+    "sales.order_items": {
+      "x": 738,
+      "y": 44
+    }
+  }
 }

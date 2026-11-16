@@ -575,10 +575,10 @@ HTML_PAGE = r"""<!DOCTYPE html>
               <div id="erStage" class="relative origin-top-left" style="width: 2800px; height: 1800px;">
                 <!-- SVG Layer for Bezier Relationship Wires -->
                 <svg id="erSvgLayer" class="absolute inset-0 w-full h-full pointer-events-none" style="z-index: 15;"></svg>
-                <!-- HTML Nodes Layer (pointer-events-none on container so clicks pass through to wires!) -->
-                <div id="erNodesLayer" class="absolute inset-0 w-full h-full pointer-events-none" style="z-index: 20;"></div>
-                <!-- Interactive SVG Layer for Relationship Pill Badges (above table cards so always clickable) -->
-                <svg id="erLabelsSvgLayer" class="absolute inset-0 w-full h-full pointer-events-none" style="z-index: 32;"></svg>
+                <!-- Interactive SVG Layer for Relationship Pill Badges (clickable in open space, never blocks table cards) -->
+                <svg id="erLabelsSvgLayer" class="absolute inset-0 w-full h-full pointer-events-none" style="z-index: 18;"></svg>
+                <!-- HTML Nodes Layer (pointer-events-none on container so clicks pass through to wires/badges in open space!) -->
+                <div id="erNodesLayer" class="absolute inset-0 w-full h-full pointer-events-none" style="z-index: 25;"></div>
                 <!-- Top SVG Layer for Active Drag-to-Connect Wire (renders above everything) -->
                 <svg id="erDragSvgLayer" class="absolute inset-0 w-full h-full pointer-events-none" style="z-index: 50;"></svg>
               </div>
@@ -1057,7 +1057,7 @@ HTML_PAGE = r"""<!DOCTYPE html>
     let isFullPageCanvas = false;
     const STAGE_BASE_W = 2800;
     const STAGE_BASE_H = 1800;
-    const STORAGE_KEY = 'yamlfixit_autosave_v4';
+    const STORAGE_KEY = 'yamlfixit_autosave_v5';
 
     // Dragging state for ER nodes, wire creation, and canvas background panning
     let dragNodeState = null; // { fullKey, startX, startY, origX, origY }
@@ -1155,9 +1155,9 @@ HTML_PAGE = r"""<!DOCTYPE html>
           }
           const key = `${t.schema || 'public'}.${t.name}`;
           const colCount = (t.columns || []).length;
-          const estHeight = 58 + colCount * 28 + 28;
+          const estHeight = 58 + colCount * 28 + 34;
           nodePositions[key] = {
-            x: 48 + visualColIdx * 345,
+            x: 48 + visualColIdx * 435,
             y: curY
           };
           curY += estHeight;
@@ -1389,7 +1389,7 @@ HTML_PAGE = r"""<!DOCTYPE html>
         card.addEventListener('pointerenter', () => setHoverHighlight(fullKey));
         card.addEventListener('pointerleave', () => setHoverHighlight(null));
 
-        // Card Header (Draggable handle + double-click inline rename)
+        // Card Header (Draggable handle + double-click inline rename + header connect handle)
         const header = document.createElement('div');
         header.className = `px-3.5 py-2.5 rounded-t-xl border-b ${style.header} flex items-center justify-between cursor-grab active:cursor-grabbing`;
         header.innerHTML = `
@@ -1398,6 +1398,9 @@ HTML_PAGE = r"""<!DOCTYPE html>
             <span ondblclick="inlineEditTable(${tIdx}, 'name', this)" class="font-bold text-xs tracking-wide text-white truncate cursor-text" title="Double-click to rename table">${escapeHtml(t.name)}</span>
           </div>
           <div class="flex items-center gap-1 shrink-0">
+            <button type="button" class="header-connect-btn text-indigo-300 hover:text-amber-300 px-1.5 py-0.5 rounded text-[10px] cursor-crosshair" title="Drag to another table to connect">
+              <i class="fa-solid fa-plug-circle-plus"></i>
+            </button>
             <button type="button" onclick="quickAddColumn(${tIdx})" class="text-slate-400 hover:text-emerald-400 px-1.5 py-0.5 rounded text-[10px]" title="Add Column">
               <i class="fa-solid fa-plus"></i>
             </button>
@@ -1406,6 +1409,13 @@ HTML_PAGE = r"""<!DOCTYPE html>
             </button>
           </div>
         `;
+        const headerConnectBtn = header.querySelector('.header-connect-btn');
+        if (headerConnectBtn) {
+          headerConnectBtn.addEventListener('pointerdown', (e) => {
+            const defCol = resolveDefaultTargetCol(fullKey) || (t.columns?.[0]?.name) || 'id';
+            startWireDrag(e, fullKey, defCol);
+          });
+        }
         header.addEventListener('pointerdown', (e) => startNodeDrag(e, fullKey));
         card.appendChild(header);
 
@@ -1416,19 +1426,21 @@ HTML_PAGE = r"""<!DOCTYPE html>
         (t.columns || []).forEach((c, cIdx) => {
           const row = document.createElement('div');
           row.className = 'relative px-3.5 py-1.5 flex items-center justify-between text-xs hover:bg-slate-800/75 group cursor-crosshair select-none';
+          row.style.touchAction = 'none';
           row.dataset.table = fullKey;
           row.dataset.column = c.name;
-          row.title = `Drag to another table to connect ${fullKey}.${c.name} (or double-click text to edit)`;
+          row.title = `Drag anywhere on this row to connect ${fullKey}.${c.name} to another table (or double-click text to edit)`;
 
-          // Allow dragging directly from any column row (except action buttons or active inline inputs)
+          // Allow dragging from ANY part of the column row (including badges/icons; only ignore active inline inputs or the delete button)
           row.addEventListener('pointerdown', (e) => {
-            if (e.target.closest('.col-action-btn') || e.target.closest('input')) return;
+            if (e.target.closest('.col-delete-btn') || e.target.closest('input')) return;
             startWireDrag(e, fullKey, c.name);
           });
 
           // Left input port
           const leftPort = document.createElement('div');
           leftPort.className = 'port-dot absolute -left-[7px] top-1/2 -translate-y-1/2';
+          leftPort.style.touchAction = 'none';
           leftPort.title = `Drag to connect ${fullKey}.${c.name}`;
           leftPort.dataset.portTable = fullKey;
           leftPort.dataset.portCol = c.name;
@@ -1437,6 +1449,7 @@ HTML_PAGE = r"""<!DOCTYPE html>
           // Right output port
           const rightPort = document.createElement('div');
           rightPort.className = 'port-dot absolute -right-[7px] top-1/2 -translate-y-1/2';
+          rightPort.style.touchAction = 'none';
           rightPort.title = `Drag to connect ${fullKey}.${c.name}`;
           rightPort.dataset.portTable = fullKey;
           rightPort.dataset.portCol = c.name;
@@ -1449,13 +1462,13 @@ HTML_PAGE = r"""<!DOCTYPE html>
           const relObj = relIdx >= 0 ? ontology.semantic_relationships[relIdx] : null;
 
           const iconHtml = c.pk
-            ? `<button type="button" onclick="toggleColPkFromCanvas(${tIdx}, ${cIdx})" class="col-action-btn text-amber-400 hover:text-amber-300 w-4 text-left" title="Primary Key (click to toggle)"><i class="fa-solid fa-key text-[10px]"></i></button>`
+            ? `<button type="button" onclick="toggleColPkFromCanvas(${tIdx}, ${cIdx})" class="col-action-btn text-amber-400 hover:text-amber-300 w-4 text-left cursor-crosshair" title="Primary Key (click to toggle, or drag to connect)"><i class="fa-solid fa-key text-[10px]"></i></button>`
             : (relIdx >= 0
-                ? `<button type="button" onclick="openEditRelationshipModal(${relIdx})" class="col-action-btn text-indigo-400 hover:text-amber-300 w-4 text-left" title="Click to edit relationship (${escapeAttr(relObj.name || 'FK')})"><i class="fa-solid fa-link text-[10px]"></i></button>`
-                : `<button type="button" onclick="toggleColPkFromCanvas(${tIdx}, ${cIdx})" class="col-action-btn text-slate-600 hover:text-amber-400 w-4 text-left text-[10px]" title="Click to mark as Primary Key">•</button>`);
+                ? `<button type="button" onclick="openEditRelationshipModal(${relIdx})" class="col-action-btn text-indigo-400 hover:text-amber-300 w-4 text-left cursor-crosshair" title="Click to edit relationship (${escapeAttr(relObj.name || 'FK')}), or drag to connect"><i class="fa-solid fa-link text-[10px]"></i></button>`
+                : `<button type="button" onclick="toggleColPkFromCanvas(${tIdx}, ${cIdx})" class="col-action-btn text-slate-600 hover:text-amber-400 w-4 text-left text-[10px] cursor-crosshair" title="Click to mark as Primary Key, or drag to connect">•</button>`);
 
           const fkBadgeHtml = relIdx >= 0
-            ? `<button type="button" onclick="openEditRelationshipModal(${relIdx})" class="col-action-btn bg-indigo-950/90 hover:bg-indigo-700 text-indigo-200 border border-indigo-500/50 rounded px-1.5 py-0.2 text-[9px] font-mono transition flex items-center gap-1" title="Click to edit relationship: ${escapeAttr(relObj.name)}">
+            ? `<button type="button" onclick="openEditRelationshipModal(${relIdx})" class="col-action-btn bg-indigo-950/90 hover:bg-indigo-700 text-indigo-200 border border-indigo-500/50 rounded px-1.5 py-0.2 text-[9px] font-mono transition flex items-center gap-1 cursor-crosshair" title="Click to edit relationship: ${escapeAttr(relObj.name)} (or drag to connect)">
                  <span>→ ${escapeHtml((relObj.target_table || '').split('.').pop())}</span>
                  <i class="fa-solid fa-pen text-[8px] text-amber-300"></i>
                </button>`
@@ -1464,15 +1477,15 @@ HTML_PAGE = r"""<!DOCTYPE html>
           row.innerHTML = `
             <div class="flex items-center gap-1.5 truncate pr-2 flex-1">
               ${iconHtml}
-              <span ondblclick="inlineEditColumn(${tIdx}, ${cIdx}, 'name', this)" class="font-mono text-[11px] ${c.pk ? 'font-semibold text-amber-200' : 'text-slate-200'} truncate cursor-text" title="Double-click to rename column (or drag to connect)">${escapeHtml(c.name)}</span>
+              <span ondblclick="inlineEditColumn(${tIdx}, ${cIdx}, 'name', this)" class="font-mono text-[11px] ${c.pk ? 'font-semibold text-amber-200' : 'text-slate-200'} truncate cursor-crosshair" title="Drag to connect (or double-click to rename column)">${escapeHtml(c.name)}</span>
             </div>
             <div class="flex items-center gap-1.5 shrink-0">
               ${fkBadgeHtml}
-              <span ondblclick="inlineEditColumn(${tIdx}, ${cIdx}, 'type', this)" class="font-mono text-[10px] text-slate-400 hover:text-indigo-300 cursor-text" title="Double-click to change data type">${escapeHtml(c.type || 'varchar')}</span>
-              <span class="text-indigo-400/60 group-hover:text-amber-300 text-[10px] px-0.5 transition" title="Drag to wire relationship">
+              <span ondblclick="inlineEditColumn(${tIdx}, ${cIdx}, 'type', this)" class="font-mono text-[10px] text-slate-400 hover:text-indigo-300 cursor-crosshair" title="Drag to connect (or double-click to change data type)">${escapeHtml(c.type || 'varchar')}</span>
+              <span class="text-indigo-400/60 group-hover:text-amber-300 text-[10px] px-0.5 transition cursor-crosshair" title="Drag to wire relationship">
                 <i class="fa-solid fa-plug-circle-plus"></i>
               </span>
-              <button type="button" onclick="removeColumnFromCanvas(${tIdx}, ${cIdx})" class="col-action-btn opacity-0 group-hover:opacity-100 text-slate-500 hover:text-rose-400 text-[10px] transition" title="Remove column">
+              <button type="button" onclick="removeColumnFromCanvas(${tIdx}, ${cIdx})" class="col-delete-btn opacity-0 group-hover:opacity-100 text-slate-500 hover:text-rose-400 text-[10px] transition cursor-pointer" title="Remove column">
                 <i class="fa-solid fa-xmark"></i>
               </button>
             </div>
@@ -1618,6 +1631,16 @@ HTML_PAGE = r"""<!DOCTYPE html>
       });
     }
 
+    function evalCubicBezier(t, p0, p1, p2, p3) {
+      const mt = 1 - t;
+      const mt2 = mt * mt;
+      const t2 = t * t;
+      return {
+        x: mt2 * mt * p0.x + 3 * mt2 * t * p1.x + 3 * mt * t2 * p2.x + t2 * t * p3.x,
+        y: mt2 * mt * p0.y + 3 * mt2 * t * p1.y + 3 * mt * t2 * p2.y + t2 * t * p3.y
+      };
+    }
+
     function drawERWires() {
       const svg = document.getElementById('erSvgLayer');
       const labelsSvg = document.getElementById('erLabelsSvgLayer') || svg;
@@ -1628,6 +1651,19 @@ HTML_PAGE = r"""<!DOCTYPE html>
 
       const stageRect = stage.getBoundingClientRect();
       const rels = ontology.semantic_relationships || [];
+
+      // Collect bounding boxes of all table cards in stage coordinates so wire pill badges avoid overlapping cards
+      const cardRects = [];
+      stage.querySelectorAll('.er-node').forEach(card => {
+        const cr = card.getBoundingClientRect();
+        cardRects.push({
+          table: card.dataset.fullTable,
+          left: (cr.left - stageRect.left) / canvasZoom,
+          right: (cr.right - stageRect.left) / canvasZoom,
+          top: (cr.top - stageRect.top) / canvasZoom,
+          bottom: (cr.bottom - stageRect.top) / canvasZoom
+        });
+      });
 
       rels.forEach((r, idx) => {
         const srcRow = stage.querySelector(`[data-table="${CSS.escape(r.source_table)}"][data-column="${CSS.escape(r.source_column)}"]`);
@@ -1643,6 +1679,11 @@ HTML_PAGE = r"""<!DOCTYPE html>
 
         const y1 = (srcRect.top + srcRect.height / 2 - stageRect.top) / canvasZoom;
         const y2 = (tgtRect.top + tgtRect.height / 2 - stageRect.top) / canvasZoom;
+
+        const invName = r.inverse_name ? ` ⇄ ${r.inverse_name}` : '';
+        const prefixIcon = isSelfRef ? '↻ ' : '';
+        const labelText = `${prefixIcon}${r.name || 'FK'} (${r.cardinality || 'N:1'}) ✎`;
+        const boxWidth = Math.max(88, labelText.length * 6.2 + 16);
 
         let x1, x2, d, midX, midY;
         if (isSelfRef) {
@@ -1667,9 +1708,30 @@ HTML_PAGE = r"""<!DOCTYPE html>
             dir2 = 1;
           }
           const dx = Math.max(55, Math.abs(x2 - x1) * 0.45);
-          d = `M ${x1} ${y1} C ${x1 + dir1 * dx} ${y1}, ${x2 + dir2 * dx} ${y2}, ${x2} ${y2}`;
-          midX = (x1 + x2) / 2;
-          midY = (y1 + y2) / 2;
+          const p0 = { x: x1, y: y1 };
+          const p1 = { x: x1 + dir1 * dx, y: y1 };
+          const p2 = { x: x2 + dir2 * dx, y: y2 };
+          const p3 = { x: x2, y: y2 };
+          d = `M ${p0.x} ${p0.y} C ${p1.x} ${p1.y}, ${p2.x} ${p2.y}, ${p3.x} ${p3.y}`;
+
+          // Choose a point along the Bezier curve that avoids overlapping any table card
+          const candidates = [0.5, 0.30, 0.70, 0.22, 0.78, 0.15, 0.85];
+          let chosenPt = evalCubicBezier(0.5, p0, p1, p2, p3);
+          for (const tVal of candidates) {
+            const pt = evalCubicBezier(tVal, p0, p1, p2, p3);
+            const halfW = boxWidth / 2 + 4;
+            const halfH = 13;
+            const overlapsCard = cardRects.some(cr =>
+              pt.x + halfW > cr.left && pt.x - halfW < cr.right &&
+              pt.y + halfH > cr.top && pt.y - halfH < cr.bottom
+            );
+            if (!overlapsCard) {
+              chosenPt = pt;
+              break;
+            }
+          }
+          midX = chosenPt.x;
+          midY = chosenPt.y;
         }
 
         const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
@@ -1703,15 +1765,10 @@ HTML_PAGE = r"""<!DOCTYPE html>
         svg.appendChild(path);
         svg.appendChild(hitPath);
 
-        // Relationship Pill Label at Midpoint (rendered in #erLabelsSvgLayer above cards so always clickable)
+        // Relationship Pill Label in open space (rendered in #erLabelsSvgLayer below cards so never blocks column dragging)
         const labelGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
         labelGroup.setAttribute('class', 'pointer-events-auto cursor-pointer');
         labelGroup.dataset.relIndex = String(idx);
-
-        const invName = r.inverse_name ? ` ⇄ ${r.inverse_name}` : '';
-        const prefixIcon = isSelfRef ? '↻ ' : '';
-        const labelText = `${prefixIcon}${r.name || 'FK'} (${r.cardinality || 'N:1'}) ✎`;
-        const boxWidth = Math.max(88, labelText.length * 6.2 + 16);
 
         const titleEl = document.createElementNS('http://www.w3.org/2000/svg', 'title');
         const fwdTip = r.forward_description || r.description || `${r.source_table} -> ${r.target_table}`;
@@ -1866,12 +1923,28 @@ HTML_PAGE = r"""<!DOCTYPE html>
       return pkCol ? pkCol.name : null;
     }
 
+    // Suppress accidental button click right after completing a drag gesture
+    window.addEventListener('click', (e) => {
+      if (window._suppressClickUntil && Date.now() < window._suppressClickUntil) {
+        e.stopPropagation();
+        e.preventDefault();
+      }
+    }, true);
+
     function resolveWireDropTarget(clientX, clientY, srcTable, srcCol) {
-      const targetEl = document.elementFromPoint(clientX, clientY);
-      if (!targetEl) return { tgtTable: null, tgtCol: null, rowEl: null, cardEl: null };
-      const portEl = targetEl.closest('[data-port-table]');
-      const rowEl = targetEl.closest('[data-table][data-column]');
-      const cardEl = targetEl.closest('[data-full-table]');
+      const els = (typeof document.elementsFromPoint === 'function')
+        ? document.elementsFromPoint(clientX, clientY)
+        : [document.elementFromPoint(clientX, clientY)].filter(Boolean);
+      if (!els.length) return { tgtTable: null, tgtCol: null, rowEl: null, cardEl: null };
+
+      let portEl = null;
+      let rowEl = null;
+      let cardEl = null;
+      for (const el of els) {
+        if (!portEl) portEl = el.closest?.('[data-port-table]') || null;
+        if (!rowEl) rowEl = el.closest?.('[data-table][data-column]') || null;
+        if (!cardEl) cardEl = el.closest?.('[data-full-table]') || null;
+      }
 
       let tgtTable = null;
       let tgtCol = null;
@@ -1931,13 +2004,28 @@ HTML_PAGE = r"""<!DOCTYPE html>
       tempGroup.appendChild(endDot);
       dragSvg.appendChild(tempGroup);
 
-      wireDragState = { srcTable, srcCol, startX, startY, tempGroup, tempLine, endDot };
+      wireDragState = {
+        srcTable,
+        srcCol,
+        startX,
+        startY,
+        startClientX: e.clientX,
+        startClientY: e.clientY,
+        moved: false,
+        tempGroup,
+        tempLine,
+        endDot
+      };
       window.addEventListener('pointermove', onWireDragMove);
       window.addEventListener('pointerup', onWireDragEnd);
     }
 
     function onWireDragMove(e) {
       if (!wireDragState) return;
+      const dist = Math.hypot(e.clientX - wireDragState.startClientX, e.clientY - wireDragState.startClientY);
+      if (dist > 4) {
+        wireDragState.moved = true;
+      }
       const stage = document.getElementById('erStage');
       const stageRect = stage.getBoundingClientRect();
       const curX = (e.clientX - stageRect.left) / canvasZoom;
@@ -1964,12 +2052,17 @@ HTML_PAGE = r"""<!DOCTYPE html>
 
     function onWireDragEnd(e) {
       if (!wireDragState) return;
-      const { srcTable, srcCol, tempGroup } = wireDragState;
+      const { srcTable, srcCol, moved, startClientX, startClientY, tempGroup } = wireDragState;
+      const finalDist = Math.hypot(e.clientX - startClientX, e.clientY - startClientY);
+      const didDrag = moved || finalDist > 4;
       if (tempGroup && tempGroup.parentNode) tempGroup.parentNode.removeChild(tempGroup);
       clearWireDropHighlights();
       wireDragState = null;
       window.removeEventListener('pointermove', onWireDragMove);
       window.removeEventListener('pointerup', onWireDragEnd);
+
+      if (!didDrag) return;
+      window._suppressClickUntil = Date.now() + 200;
 
       const { tgtTable, tgtCol } = resolveWireDropTarget(e.clientX, e.clientY, srcTable, srcCol);
       if (tgtTable && tgtCol && (tgtTable !== srcTable || tgtCol !== srcCol)) {
