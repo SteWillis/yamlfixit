@@ -792,7 +792,7 @@ HTML_PAGE = r"""<!DOCTYPE html>
   <!-- MODAL 1: Multi-Format Paste / File Upload / FixIt Dialog              -->
   <!-- Uses native <dialog closedby="any"> per modern-web-guidance           -->
   <!-- ===================================================================== -->
-  <dialog id="importDialog" closedby="any" aria-labelledby="importDialogTitle" class="rounded-2xl bg-white border border-slate-200 shadow-2xl p-0 w-full max-w-3xl text-slate-800">
+  <dialog id="importDialog" aria-labelledby="importDialogTitle" class="rounded-2xl bg-white border border-slate-200 shadow-2xl p-0 w-full max-w-3xl text-slate-800">
     <div class="p-5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
       <div class="flex items-center gap-2.5">
         <div class="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center">
@@ -903,7 +903,7 @@ HTML_PAGE = r"""<!DOCTYPE html>
   <!-- ===================================================================== -->
   <!-- MODAL 2: Connect Tables / Edit Bidirectional Relationship Dialog       -->
   <!-- ===================================================================== -->
-  <dialog id="relDialog" closedby="any" aria-labelledby="relDialogTitle" class="rounded-2xl bg-white border border-slate-200 shadow-2xl p-0 w-full max-w-2xl text-slate-800">
+  <dialog id="relDialog" aria-labelledby="relDialogTitle" class="rounded-2xl bg-white border border-slate-200 shadow-2xl p-0 w-full max-w-2xl text-slate-800">
     <div class="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
       <div class="flex items-center gap-2.5">
         <div class="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-sm">
@@ -1041,20 +1041,45 @@ HTML_PAGE = r"""<!DOCTYPE html>
     // Initialize Mermaid for Markdown preview
     mermaid.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'loose' });
 
-    // Fallback for browsers without native <dialog closedby="any"> support (per modern-web-guidance)
-    if (!('closedBy' in HTMLDialogElement.prototype)) {
-      const outside = (e, dialog) => {
-        const r = dialog.getBoundingClientRect();
-        return e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
-      };
-      for (const dialog of document.querySelectorAll('dialog[closedby="any"]')) {
-        let pressedOutside = false;
-        dialog.addEventListener('pointerdown', (e) => { pressedOutside = outside(e, dialog); });
-        dialog.addEventListener('pointerup', (e) => { if (pressedOutside && outside(e, dialog)) dialog.close(); });
+    // Safe backdrop light-dismiss for <dialog> that never closes on stray drag-release events
+    function openModalSafely(dialogId) {
+      const dlg = document.getElementById(dialogId);
+      if (!dlg) return;
+      dlg._openedAt = Date.now();
+      dlg._pressedBackdrop = false;
+      if (!dlg.open) {
+        dlg.showModal();
       }
     }
+
+    const isOutsideDialogBox = (e, dialog) => {
+      const r = dialog.getBoundingClientRect();
+      return e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
+    };
     for (const dialog of document.querySelectorAll('dialog')) {
-      dialog.addEventListener('close', () => { dialog.returnValue = ''; });
+      dialog._openedAt = 0;
+      dialog._pressedBackdrop = false;
+      dialog.addEventListener('pointerdown', (e) => {
+        if (Date.now() - (dialog._openedAt || 0) < 350) {
+          dialog._pressedBackdrop = false;
+          return;
+        }
+        dialog._pressedBackdrop = (e.target === dialog) && isOutsideDialogBox(e, dialog);
+      });
+      dialog.addEventListener('pointerup', (e) => {
+        if (Date.now() - (dialog._openedAt || 0) < 350) {
+          dialog._pressedBackdrop = false;
+          return;
+        }
+        if (dialog._pressedBackdrop && (e.target === dialog) && isOutsideDialogBox(e, dialog)) {
+          dialog.close();
+        }
+        dialog._pressedBackdrop = false;
+      });
+      dialog.addEventListener('close', () => {
+        dialog.returnValue = '';
+        dialog._pressedBackdrop = false;
+      });
     }
 
     // Canonical Ontology State
@@ -1898,7 +1923,7 @@ HTML_PAGE = r"""<!DOCTYPE html>
         const tgtCol = resolveDefaultTargetCol(fullKey);
         cancelActiveWireConnect();
         if (fullKey && tgtCol && (fullKey !== origSrcTable || tgtCol !== origSrcCol)) {
-          openNewRelationshipModal(origSrcTable, origSrcCol, fullKey, tgtCol);
+          setTimeout(() => openNewRelationshipModal(origSrcTable, origSrcCol, fullKey, tgtCol), 20);
         }
         return;
       }
@@ -2024,8 +2049,6 @@ HTML_PAGE = r"""<!DOCTYPE html>
       hideWireConnectBanner();
       window.removeEventListener('pointermove', onWireDragMove);
       window.removeEventListener('pointerup', onWireDragEnd);
-      window.removeEventListener('mousemove', onWireDragMove);
-      window.removeEventListener('mouseup', onWireDragEnd);
     }
 
     // Prevent native HTML5 drag-and-drop inside the ER canvas in Edge and Chrome
@@ -2046,7 +2069,7 @@ HTML_PAGE = r"""<!DOCTYPE html>
         cancelActiveWireConnect();
         window._suppressClickUntil = Date.now() + 250;
         if (srcTable && srcCol && (srcTable !== origSrcTable || srcCol !== origSrcCol)) {
-          openNewRelationshipModal(origSrcTable, origSrcCol, srcTable, srcCol);
+          setTimeout(() => openNewRelationshipModal(origSrcTable, origSrcCol, srcTable, srcCol), 20);
         }
         return;
       }
@@ -2107,8 +2130,6 @@ HTML_PAGE = r"""<!DOCTYPE html>
 
       window.addEventListener('pointermove', onWireDragMove);
       window.addEventListener('pointerup', onWireDragEnd);
-      window.addEventListener('mousemove', onWireDragMove);
-      window.addEventListener('mouseup', onWireDragEnd);
     }
 
     function onWireDragMove(e) {
@@ -2167,7 +2188,7 @@ HTML_PAGE = r"""<!DOCTYPE html>
 
       const { tgtTable, tgtCol } = resolveWireDropTarget(e.clientX, e.clientY, srcTable, srcCol);
       if (tgtTable && tgtCol && (tgtTable !== srcTable || tgtCol !== srcCol)) {
-        openNewRelationshipModal(srcTable, srcCol, tgtTable, tgtCol);
+        setTimeout(() => openNewRelationshipModal(srcTable, srcCol, tgtTable, tgtCol), 20);
       }
     }
 
@@ -2646,7 +2667,7 @@ HTML_PAGE = r"""<!DOCTYPE html>
       document.getElementById('relCardinality').value = 'N:1';
       suggestRelName(true);
 
-      document.getElementById('relDialog').showModal();
+      openModalSafely('relDialog');
     }
 
     function openEditRelationshipModal(idx) {
@@ -2683,7 +2704,7 @@ HTML_PAGE = r"""<!DOCTYPE html>
       if (!fwd || !rev) suggestRelName(false);
       else updateBidirectionalLabels();
 
-      document.getElementById('relDialog').showModal();
+      openModalSafely('relDialog');
     }
 
     function saveRelationshipModal() {
